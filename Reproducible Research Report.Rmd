@@ -1,0 +1,81 @@
+---
+title: "Reproducible Research"
+author: "Amy"
+date: "08/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Synopsis
+
+## Package loading
+Load required packages
+```{r}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+```
+
+## Data Processing
+First the data is downloaded and read as a CSV file into the global environment.
+
+Event types are very varied, in order to not cloud the data, only events specifically listed in the documentation 7. Event Types will be included. (Stored in variable 'events')
+
+```{r, cache =TRUE}
+#Download and read in data if not already in environment
+if (!exists('data')) {
+  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "Storm data.csv.bz2")
+  data<-read.csv("Storm data.csv.bz2", na.strings = "?")
+  write.csv(data, "Storm data.csv")
+}
+data<-read.csv("Storm data.csv")
+
+events<-c("Astronomical Low Tide","Avalanche","Blizzard","Coastal Flood","Cold/Wind Chill","Debris Flow","Dense Fog", "Dense Smoke", "Drought", "Dust Devil", "Dust Storm", "Excessive Heat", "Extreme Cold/Wind Chill", "Flash Flood", "Flood", "Frost/Freeze", "Funnel Cloud", "Freezing Fog", "Hail", "Heat", "Heavy Rain", "Heavy Snow", "High Surf","High Wind", "Hurricane (Typhoon)", "Ice Storm", "Lake-Effect Snow","Lakeshore Flood", "Lightning","Marine Hail","Marine High Wind","Marine Strong Wind","Marine Thunderstorm Wind", "Rip Current", "Seiche","Sleet", "Storm Surge/Tide", "Strong Wind", "Thunderstorm Wind","Tornado", "Tropical Depression", "Tropical Storm", "Tsunami", "Volcanic Ash", "Waterspout", "Wildfire", "Winter Storm", "Winter Weather")
+```
+
+## Analysis
+### Storm events ~ Population Health
+Next, subset the data to answer the first question - which types of events are most harmful with respect to population health? I chose fatalities and injuries as markers of population health, although damages could also have been included. I summed fatalities and injuries into morbidity, then plotted the totals against the event type that caused them. This can be seen in plot 1.
+
+```{r}
+popn<-data %>%
+   select(EVTYPE, FATALITIES, INJURIES)
+events<-toupper(events)
+popn$EVTYPE<-toupper(popn$EVTYPE)
+popn<-popn[which (popn$EVTYPE %in% events), ]
+popn_sig<- popn %>%
+  select(EVTYPE, FATALITIES, INJURIES) %>%
+    group_by(EVTYPE) %>%
+      summarise_all(sum)
+popn_sig$MORBIDITY <- popn_sig$FATALITIES + popn_sig$INJURIES
+popn_sig<- popn_sig %>%
+  select(EVTYPE, MORBIDITY)
+popn_sig<-popn_sig[which(popn_sig$MORBIDITY > 0),]
+(plot1<-ggplot(data=popn_sig, aes(x=EVTYPE, y=MORBIDITY, fill=EVTYPE), color=popn_sig$EVTYPE) + geom_bar(stat="identity") + scale_y_continuous(trans='log10') + xlab("Event") + ylab("Total of fatalities and injuries") + theme(axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5, hjust=1), legend.position="none"))
+```
+As can be seen from the above plot, tornadoes cause far more population damage than any other events. Other major causes of population damage are excessive heat, floods and lightning.
+
+### Storm events ~ Economic Damage
+Another subset of the data was taken to look at economic damage, this time looking at property and crop damage. A similar plot to above was produced.
+
+```{r}
+econ<-data %>%
+   select(EVTYPE, PROPDMG, CROPDMG)
+econ$EVTYPE<-toupper(econ$EVTYPE)
+econ<-econ[which (econ$EVTYPE %in% events), ]
+econ_sig<- econ %>%
+  select(EVTYPE, PROPDMG, CROPDMG) %>%
+    group_by(EVTYPE) %>%
+      summarise_all(sum)
+econ_sig$ECON <- econ_sig$PROPDMG + econ_sig$CROPDMG
+econ_sig<- econ_sig %>%
+  select(EVTYPE, ECON)
+econ_sig<-econ_sig[which(econ_sig$ECON > 0),]
+(plot1<-ggplot(data=econ_sig, aes(x=EVTYPE, y=ECON, fill=EVTYPE)) + geom_bar(stat="identity") + scale_y_continuous(trans='log10') + xlab("Event") + ylab("Total of property and \ncrop damages") + theme(axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5, hjust=1), legend.position="none"))
+```
+Economic damage was mainly caused by tornadoes, as well as flash floods, floods, funnel clouds and thunderstorm winds. 
+
+In conclusion, the main area of focus to prevent damages to people and properties is tornado damage prevention.
